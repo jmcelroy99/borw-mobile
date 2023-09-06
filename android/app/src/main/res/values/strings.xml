@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Borw</string>
+    <string name="facebook_app_id">939461513228982</string>
+    <string name="fb_login_protocol_scheme">fb939461513228982</string>
+</resources>

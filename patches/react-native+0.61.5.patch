@@ -1,0 +1,62 @@
+diff --git a/node_modules/react-native/Libraries/Image/RCTUIImageViewAnimated.m b/node_modules/react-native/Libraries/Image/RCTUIImageViewAnimated.m
+index 01aa75f..53aea3a 100644
+--- a/node_modules/react-native/Libraries/Image/RCTUIImageViewAnimated.m
++++ b/node_modules/react-native/Libraries/Image/RCTUIImageViewAnimated.m
+@@ -266,6 +266,9 @@ - (void)displayDidRefresh:(CADisplayLink *)displayLink
+ 
+ - (void)displayLayer:(CALayer *)layer
+ {
++  if (!_currentFrame) {
++    _currentFrame = self.image;
++  }
+   if (_currentFrame) {
+     layer.contentsScale = self.animatedImageScale;
+     layer.contents = (__bridge id)_currentFrame.CGImage;
+diff --git a/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/modules/systeminfo/AndroidInfoModule.java b/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/modules/systeminfo/AndroidInfoModule.java
+index ef2ae93..2795802 100644
+--- a/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/modules/systeminfo/AndroidInfoModule.java
++++ b/node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/modules/systeminfo/AndroidInfoModule.java
+@@ -92,7 +92,7 @@ public class AndroidInfoModule extends ReactContextBaseJavaModule implements Tur
+ 
+   private Boolean isRunningScreenshotTest() {
+     try {
+-      Class.forName("android.support.test.rule.ActivityTestRule");
++      Class.forName("androidx.test.rule.ActivityTestRule");
+       return true;
+     } catch (ClassNotFoundException ignored) {
+       return false;
+diff --git a/node_modules/react-native/react.gradle b/node_modules/react-native/react.gradle
+index a84417b..7c5bf7c 100644
+--- a/node_modules/react-native/react.gradle
++++ b/node_modules/react-native/react.gradle
+@@ -119,6 +119,23 @@ afterEvaluate {
+                 jsSourceMapsDir.mkdirs()
+             }
+ 
++            doLast {
++              def moveFunc = { resSuffix ->
++                File originalDir = file("$buildDir/generated/res/react/release/${resSuffix}");
++                if (originalDir.exists()) {
++                    File destDir = file("$buildDir/../src/main/res/${resSuffix}");
++                    ant.move(file: originalDir, tofile: destDir);
++                }
++              }
++              moveFunc.curry("drawable-ldpi").call()
++              moveFunc.curry("drawable-mdpi").call()
++              moveFunc.curry("drawable-hdpi").call()
++              moveFunc.curry("drawable-xhdpi").call()
++              moveFunc.curry("drawable-xxhdpi").call()
++              moveFunc.curry("drawable-xxxhdpi").call()
++              moveFunc.curry("raw").call()
++            }
++
+             // Set up inputs and outputs so gradle can cache the result
+             inputs.files fileTree(dir: reactRoot, excludes: inputExcludes)
+             outputs.dir(jsBundleDir)
+diff --git a/node_modules/react-native/scripts/.packager.env b/node_modules/react-native/scripts/.packager.env
+new file mode 100644
+index 0000000..361f5fb
+--- /dev/null
++++ b/node_modules/react-native/scripts/.packager.env
+@@ -0,0 +1 @@
++export RCT_METRO_PORT=8081

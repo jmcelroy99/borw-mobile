@@ -1,0 +1,109 @@
+fastlane_version '2.142.0'
+
+generic_appcenter_info = {
+  api_token: ENV['APP_CENTER_TOKEN'],
+  owner_type: 'organization',
+  owner_name: ENV['APP_CENTER_ORG_NAME'],
+  release_notes: Time.now.strftime('%Y%m%d %H:%M:%S'),
+  destinations: ENV['APP_CENTER_GROUP'],
+  destination_type: "group"
+}
+
+before_all do
+  # ensure_git_branch
+  # ensure_git_status_clean
+  # git_pull
+  prepare_all
+end
+
+desc 'Prepare for the builds'
+private_lane :prepare_all do
+  Dir.chdir('../') do
+    # sh '. ~/.nvm/nvm.sh && nvm use 8.12.0'
+    sh 'yarn install'
+  end
+end
+
+platform :ios do
+  desc 'Prepare for iOS'
+  private_lane :prepare do
+    increment_build_number(xcodeproj: './ios/BorwApp.xcodeproj')
+    Dir.chdir('../ios') do
+      sh 'pod install'
+    end
+  end
+
+  desc 'Build the iOS application.'
+  private_lane :build_adhoc do
+    prepare
+    build_app(
+      silent: true,
+      scheme: 'BorwApp',
+      export_method: 'ad-hoc',
+      workspace: './ios/BorwApp.xcworkspace',
+      clean: true,
+      output_directory: './ios/build/',
+      output_name: 'Borw_Adhoc.ipa',
+      export_options: {
+        provisioningProfiles: {
+          'app.borw' => 'Borw_Live_Adhoc'
+        }
+      }
+    )
+  end
+
+  desc 'Build and ship the iOS app to App Center'
+  lane :beta do
+    build_adhoc
+    appcenter_upload(
+      generic_appcenter_info.merge(
+        app_name: ENV['APP_CENTER_APP_NAME_IOS'],
+        ipa: './ios/build/Borw_Adhoc.ipa'
+      )
+    )
+    #git_commit(path: ['./ios/BorwApp.xcodeproj', './ios/BorwApp/Info.plist'], message: 'iOS Bump versionCode')
+    #push_to_git_remote
+  end
+end
+
+platform :android do
+  desc 'Build the Android application.'
+  private_lane :build do
+    prepare
+    gradle(
+      task: 'assemble',
+      build_type: 'Release',
+      project_dir: 'android/',
+      #print_command_output: false,
+      properties: {
+        'android.injected.signing.store.file' => File.expand_path(File.dirname(__FILE__), ENV['ANDROID_KEYSTORE_FILE']),
+        'android.injected.signing.store.password' => ENV['ANDROID_KEYSTORE_PASSWORD'],
+        'android.injected.signing.key.alias' => ENV['ANDROID_KEY_ALIAS'],
+        'android.injected.signing.key.password' => ENV['ANDROID_KEYSTORE_PASSWORD'],
+      }
+    )
+  end
+
+  desc 'Build and ship the Android app to App Center'
+  lane :beta do
+    build
+    appcenter_upload(
+      generic_appcenter_info.merge(
+        app_name: ENV['APP_CENTER_APP_NAME_ANDROID'],
+        apk: './android/app/build/outputs/apk/release/app-release.apk'
+      )
+    )
+    #git_commit(path: ['./android/gradle.properties'], message: 'Bump versionCode')
+    # push_to_git_remote
+  end
+  private_lane :prepare do
+    gradle(task: 'incrementVersionCode', project_dir: 'android/')
+    gradle(task: 'clean', project_dir: 'android/')
+
+    Dir.chdir('../') do
+      #sh '. ~/.nvm/nvm.sh && nvm use 8.12.0'
+      sh 'rm -rf android/app/build'
+      sh 'react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res'
+    end
+  end
+end
